@@ -14,7 +14,6 @@ use function PHPUnit\Framework\returnSelf;
 class PresensiController extends Controller
 {
 
-
 //Menampilkan halaman presensi.
     public function create()
     {
@@ -25,8 +24,26 @@ class PresensiController extends Controller
     }
 
 //Menyimpan data presensi (masuk atau pulang) ke database.
-    public function store(Request $request)
-    {
+public function store(Request $request)
+{
+    // Mendapatkan koordinat presensi dari request
+    $latitude = $request->latitude;
+    $longitude = $request->longitude;
+
+    // Koordinat yang diizinkan
+    $allowedLatitude = -7.004779773163583;
+    $allowedLongitude = 107.57826546009974;
+
+    // Menghitung jarak antara koordinat presensi dengan koordinat yang diizinkan
+    $distance = $this->calculateDistance($latitude, $longitude, $allowedLatitude, $allowedLongitude);
+
+    // Jarak maksimum yang diizinkan (contoh: 0.001 derajat, sesuaikan dengan kebutuhan)
+    $maxAllowedDistance = 0.2; //saya memberi toleransi jarak dari titik koordinat sejauh 200meter
+
+    // Pemeriksaan apakah presensi dilakukan di lokasi yang diizinkan
+    if ($distance <= $maxAllowedDistance) {
+        // Lanjutkan dengan proses presensi
+
         $nik = Auth::guard('karyawan')->user()->nik;
         $tgl_presensi = date("Y-m-d");
         $foto_masuk = date("H:i:s");
@@ -83,7 +100,28 @@ class PresensiController extends Controller
                 return redirect('/')->with('error', 'Gagal memasukkan data masuk.');
             }
         }
+
+    } else {
+        // Presensi dilakukan di lokasi yang tidak diizinkan
+        return redirect('/')->with('error', 'Anda tidak dapat melakukan presensi di lokasi ini.');
     }
+}
+
+// Fungsi untuk menghitung jarak antara dua koordinat menggunakan formula Haversine
+private function calculateDistance($lat1, $lon1, $lat2, $lon2)
+{
+    $earthRadius = 0.001; // Radius bumi dalam kilometer
+
+    $dLat = deg2rad($lat2 - $lat1);
+    $dLon = deg2rad($lon2 - $lon1);
+
+    $a = sin($dLat / 2) * sin($dLat / 2) + cos(deg2rad($lat1)) * cos(deg2rad($lat2)) * sin($dLon / 2) * sin($dLon / 2);
+    $c = 2 * atan2(sqrt($a), sqrt(1 - $a));
+
+    $distance = $earthRadius * $c;
+
+    return $distance;
+}
 
     //edit profile
     public function edit(){
@@ -135,17 +173,21 @@ class PresensiController extends Controller
 
     // membuat histori presensi
     public function history(){
+        $now = now();
+        $years = [$now->year - 1, $now->year, $now->year + 1];
 
-        $namabulan =["","Januari", "Februari", "Maret", "April", "Mei", "Juni",
-                    "Juli", "Agustus", "September","Oktober", "November","Desember"];
-        return view('presensi.history' , compact('namabulan'));
-}
+        $namabulan = ["", "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                      "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+
+        return view('presensi.history', compact('namabulan', 'years'));
+    }
 
     public function gethistory(Request $request)
     {
         $bulan = $request->bulan;
         $tahun = $request->tahun;
         $nik = Auth::guard('karyawan')->user()->nik;
+
         $history = DB::table('presensis')
             ->whereRaw('MONTH(tgl_presensi)="'.$bulan.'"')
             ->whereRaw('YEAR(tgl_presensi)="'.$tahun.'"')
@@ -156,5 +198,3 @@ class PresensiController extends Controller
         return view('presensi.gethistory', compact('history'));
     }
 }
-
-

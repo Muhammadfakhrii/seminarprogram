@@ -22,13 +22,9 @@
                 <div class="form-group">
                     <select name="tahun" id="tahun" class="form-control">
                         <option value="">Tahun</option>
-                        @php
-                            $tahunmulai = date("Y");
-                            $tahundepan = date("Y") + 1;
-                        @endphp
-                        @for ($tahun = $tahunmulai; $tahun <= $tahundepan; $tahun++)
-                            <option value="{{ $tahun }}">{{ $tahun }}</option>
-                        @endfor
+                        @foreach($years as $year)
+                            <option value="{{ $year }}">{{ $year }}</option>
+                        @endforeach
                     </select>
                 </div>
             </div>
@@ -40,6 +36,7 @@
         </div>
     </div>
 </div>
+
 <!-- Tambahkan tempat untuk menampilkan hasil pencarian -->
 <div id="historyResults"></div>
 @endsection
@@ -54,7 +51,7 @@
                 type: 'POST',
                 url: '/gethistory',
                 data: {
-                    "_token": "{{ csrf_token() }}", // Ganti @csrf dengan "_token"
+                    "_token": "{{ csrf_token() }}",
                     bulan: bulan,
                     tahun: tahun,
                 },

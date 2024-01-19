@@ -1,74 +1,130 @@
 @extends('layouts.presensi')
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Presensi</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/webcamjs/1.0.26/webcam.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/twitter-bootstrap/4.1.3/css/bootstrap.min.css" />
 
-    <style type="text/css">
-        #results { padding:20px; border:1px solid; background:#ccc; }
-    </style>
-</head>
-<body>
-<div class="container">
-    <form method="POST" action="{{ route('presensi.store') }}">
-        @csrf
-        <div class="row">
-            <div class="col-md-6">
-                <div id="my_camera"></div>
-                <br/>
-                <input type=button value="Take Snapshot" onClick="take_snapshot()">
-                <input type="hidden" name="image" class="image-tag">
-            </div>
-
-            <div class="col-md-6">
-                <div id="results">Your captured image will appear here...</div>
-            </div>
-
-            <div class="col-md-12 text-center">
-                <br/>
-                <button class="btn btn-primary" id="absenButton">Absen Keluar</button>
-            </div>
-        </div>
-    </form>
+@section('header')
+<!-- App Header -->
+<div class="appHeader bg-primary text-light">
+    <div class="left">
+        <a href="javascript:;" class="headerButton goBack">
+            <ion-icon name="chevron-back-outline"></ion-icon>
+        </a>
+    </div>
+    <div class="pageTitle">Presensi Kamera</div>
+    <div class="right"></div>
 </div>
-<script language="JavaScript">
+<!-- * App Header -->
 
-    Webcam.set({
-        width: 490,
-        height: 350,
-        image_format: 'jpeg',
-        jpeg_quality: 90
-    });
-    Webcam.attach( '#my_camera' );
+<style>
+    .webcam-capture,
+    .webcam-capture video{
+        display: inline-block;
+        width: 100% !important;
+        margin: auto;
+        height: auto !important;
+        border-radius: 15px;
+    }
+    #map { height: 200px; }
+</style>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+@endsection
 
-    // Variable untuk mengidentifikasi apakah sudah absen masuk atau belum
-    let absenMasuk = false;
+@section('content')
+<div class="row" style="margin-top: 70px">
+    <div class="col">
+        <input type="hidden" id="lokasi">
+        <div class="webcam-capture"></div>
+    </div>
+</div>
+<div class="row">
+    <div class="col">
+        @if ($cek > 0)
+        <button id="takeabsen" class="btn btn-danger btn-block">
+            <ion-icon name="camera-outline"></ion-icon>
+            Presensi Pulang</button>
+            @else
+            <button id="takeabsen" class="btn btn-primary btn-block">
+            <ion-icon name="camera-outline"></ion-icon>
+            Presensi Masuk</button>
+        @endif
+    </div>
+</div>
+<div class="row mt-2">
+    <div class="col">
+        <div id="map"></div>
+    </div>
+</div>
+@endsection
 
-    function take_snapshot() {
-        Webcam.snap(function(data_uri) {
-            $(".image-tag").val(data_uri);
-            document.getElementById('results').innerHTML = '<img src="'+data_uri+'"/>';
+@push('myscript')
+    <script>
+        Webcam.set({
+            height: 480,
+            width: 640,
+            image_format: 'jpeg',
+            jpeg_quality: 80
         });
 
-        // Mengganti teks tombol sesuai dengan kondisi absenMasuk
-        if (!absenMasuk) {
-            document.getElementById('absenButton').innerHTML = 'Absen Keluar';
-            absenMasuk = true;
-        } else {
-            document.getElementById('absenButton').innerHTML = 'Absen Masuk';
-            absenMasuk = false;
+        var lokasi = document.getElementById('lokasi');
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(successCallback, errorCallback);
         }
-        @if(session('error'))
-    <div class="alert alert-danger">
-        {{ session('error') }}
-    </div>
-@endif
 
-    }
+        function successCallback(position) {
+            lokasi.value = position.coords.latitude + "," + position.coords.longitude;
+            var map = L.map('map').setView([position.coords.latitude, position.coords.longitude], 13);
+            L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                maxZoom: 19,
+                attribution: '&copy; <a href="http://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            }).addTo(map);
+            var marker = L.marker([position.coords.latitude, position.coords.longitude]).addTo(map);
+            var circle = L.circle([-6.950286216542213, 107.62459901857964], {
+                color: 'red',
+                fillColor: '#f03',
+                fillOpacity: 0.5,
+                radius: 50
+            }).addTo(map);
 
-</script>
-</body>
-</html>
+            Webcam.attach('.webcam-capture');
+        }
+
+        function errorCallback() {}
+
+        $("#takeabsen").click(function(e) {
+            Webcam.snap(function(uri) {
+                image = uri;
+            });
+
+            var lokasi = $("#lokasi").val();
+
+            $.ajax({
+                type: 'POST',
+                url: '/presensi/store',
+                data: {
+                    _token: "{{ csrf_token() }}",
+                    image: image,
+                    lokasi: lokasi,
+                },
+                cache: false,
+                success: function(respond) {
+                    var status = respond.split("|");
+                    if (status[0] == "success") {
+                        Swal.fire({
+                            title: 'Berhasil',
+                            text: status[1],
+                            icon: 'success'
+                        })
+                        setTimeout("location.href='/dashboard'", 3000);
+                    } else {
+                        Swal.fire({
+                            title: 'Gagal',
+                            text: status[1],
+                            icon: 'error'
+                        })
+                        setTimeout("location.href='/dashboard'", 3000);
+                    }
+                }
+            });
+        });
+    </script>
+@endpush

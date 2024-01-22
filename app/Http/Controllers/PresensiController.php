@@ -49,7 +49,9 @@ class PresensiController extends Controller
         $file = $folderPath . $fileName;
 
         $cek = DB::table('presensis')->where('tgl_presensi', $tgl_presensi)->where('nik', $nik)->count();
-        if ($radius > 50){
+        if ($cek > 0) {
+            echo "error|Anda Sudah Melakukan Presensi Hari Ini|";
+        } elseif ($radius > 50) {
             echo "error|Anda Diluar Radius Kantor|";
         } else {
         if ($cek > 0) {
